@@ -95,13 +95,12 @@ See also the list of Signalk-server [contributors](https://github.com/SignalK/si
 
 ## License
 
-The original project declares two different licenses and ships neither as a
-file: `package.json` and this README say ISC, while the header of `index.js`
-says Apache License 2.0, copyright 2019 Ewald van Gemert. Both are permissive,
-so the difference does not restrict use, but since it is genuinely ambiguous
-this fork keeps every original notice untouched and ships the Apache 2.0 text
-as `LICENSE`, that being the only license the source itself points at. Modified
-files carry a notice of the change, as Apache 2.0 requires.
+Apache License 2.0, copyright 2019 Ewald van Gemert.
 
-If you need certainty for your own use, read both licenses. Neither imposes
-copyleft obligations.
+The original project declares two different licenses and ships neither as a
+file: its `package.json` says ISC, while the header of `index.js` says Apache
+License 2.0. Both are permissive and neither imposes copyleft obligations, so
+the difference does not restrict use. This fork follows the license the source
+itself names and points at, ships that text as `LICENSE`, keeps the original
+copyright notice intact, and marks modified files as changed, as Apache 2.0
+requires.
