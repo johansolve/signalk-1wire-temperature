@@ -27,6 +27,19 @@ You can find documentation of connecting and enabeling 1-wire sensors on your Ra
 You will have to enable the 1-wire protocol on the Raspberry-Pi
 - [Enable 1-wire](https://www.raspberrypi-spy.co.uk/2018/02/enable-1-wire-interface-raspberry-pi/)
 
+### Configuration
+
+Each detected sensor is listed in the plugin configuration with these settings:
+
+- **Sensor Id** - the 1-wire id of the sensor
+- **Location name** - a human readable name, also published as the `displayName` of the path so displays can label the value
+- **Signal K Path** - the full Signal K path for this sensor, for example `propulsion.0.temperature` or `electrical.alternators.0.temperature`
+- **Signal K Key** - deprecated. When no full path is set, this key is appended to `environment` to build the path
+
+Existing configurations keep working unchanged: sensors without a **Signal K Path** still publish under `environment.<key>`.
+
+Temperatures are published in Kelvin and the plugin sets `units` on each path, so displays can convert to the unit of your choice.
+
 ### Building examples
 
 - ![alt BreadBoard Example](https://raw.githubusercontent.com/ewaldvangemert/signalk-raspberry-pi-1wire/master/examples/raspberry-breadboard-1wire.jpg)

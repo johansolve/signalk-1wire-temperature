@@ -20,6 +20,7 @@ const _ds18b20 = require('ds18b20')
 module.exports = function (app) {
   let _deviceList = [];
   let _timer = null;
+  let _generation = 0;
   let plugin = {}
 
   plugin.id = 'raspberry-pi-1wire'
@@ -53,8 +54,14 @@ module.exports = function (app) {
             key: {
               type: 'string',
               title: 'Signal K Key',
-              description: 'This is used to build the path in Signal K. It will be appended to \'environment\'',
+              description: 'Deprecated, use \'Signal K Path\' instead. This is appended to \'environment\' to build the path. Ignored when a full path is set.',
               default: 'inside.engineroom.temperature'
+            },
+            path: {
+              type: 'string',
+              title: 'Signal K Path',
+              description: 'Full Signal K path for this sensor, for example \'propulsion.0.temperature\' or \'electrical.alternators.0.temperature\'. Leave empty to fall back on the deprecated key above.',
+              default: ''
             }
           }
         }
@@ -64,7 +71,13 @@ module.exports = function (app) {
 
   plugin.start = function (options) {
 
+    // a config save stops and restarts the plugin, so ignore the sensor
+    // enumeration of a previous run that is still in flight
+    _deviceList = []
+    var generation = ++_generation
+
     _ds18b20.sensors(function (err, ids) {
+      if (generation !== _generation) return
 
       var saveOptions = false
       _.each(ids, function (id) {
@@ -80,19 +93,22 @@ module.exports = function (app) {
         
         _deviceList.push(device);
       })
-      
+
       // save devicelist if new device detected
       if (saveOptions) {
         app.savePluginOptions(options, function () {
         })
       }
-      
+
+      sendMetas()
+
       measureTemperatures()
       _timer = setInterval(measureTemperatures, options.rate * 1000)
     })
   }
 
   plugin.stop = function () {
+    _generation++
     _deviceList = []
     if (_timer) {
       clearInterval(_timer)
@@ -102,6 +118,11 @@ module.exports = function (app) {
 
   function measureTemperatures() {
     _.each(_deviceList, function (device) {
+      // skip sensors that have neither a path nor a key configured
+      if (!devicePath(device)) {
+        app.debug('no path or key configured for sensor ' + device.oneWireId)
+        return
+      }
       // measure temperature
       _ds18b20.temperature(device.oneWireId, function (err, value) {
         var temperature = value + 273.15
@@ -113,6 +134,37 @@ module.exports = function (app) {
     })
   }
   
+  function devicePath (device) {
+    if (device.path) return device.path
+    if (device.key) return 'environment.' + device.key
+    return null
+  }
+
+  function sendMetas () {
+    var metas = _.filter(_.map(_deviceList, function (device) {
+      var path = devicePath(device)
+      if (!path) return null
+      return {
+        'path': path,
+        'value': {
+          'units': 'K',
+          'displayName': device.locationName
+        }
+      }
+    }), function (meta) {
+      return meta !== null
+    })
+
+    app.handleMessage(plugin.id, {
+      'context': 'vessels.' + app.selfId,
+      'updates': [
+        {
+          'meta': metas
+        }
+      ]
+    })
+  }
+
   function createDeltaMessage (device, temperature) {
     return {
       'context': 'vessels.' + app.selfId,
@@ -124,7 +176,7 @@ module.exports = function (app) {
           'timestamp': (new Date()).toISOString(),
           'values': [
             {
-              'path': 'environment.' + device.key,
+              'path': devicePath(device),
               'value': temperature
             }
           ]
