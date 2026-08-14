@@ -36,6 +36,17 @@ You can use a ISDN splitter to house a sensor, and plugin two more sensors. You 
 - ![alt ISDN splitter internals](https://raw.githubusercontent.com/ewaldvangemert/signalk-raspberry-pi-1wire/master/examples/raspberry-1wire-from-isdn-splitter.jpg)
 - ![alt ISDN splitter](https://raw.githubusercontent.com/ewaldvangemert/signalk-raspberry-pi-1wire/master/examples/raspberry-1wire-from-isdn-splitter2.jpg)
 
+## Configuration
+
+Every sensor found on the bus is listed in the plugin configuration.
+
+- **Sensor Id** - the 1-wire id of the sensor
+- **Location name** - a human readable name for the sensor
+- **Signal K Key** - appended to `environment` to build the path, so `inside.engineroom.temperature` becomes `environment.inside.engineroom.temperature`
+- **Signal K Path** - the full Signal K path for this sensor, for example `propulsion.0.temperature` or `electrical.alternators.0.temperature`. Leave it empty to build the path from the key above
+
+Temperatures are published in Kelvin.
+
 ## Contributing
 
 Please read [Readme.md](https://github.com/SignalK/signalk-server-node) for details on Signal-K.

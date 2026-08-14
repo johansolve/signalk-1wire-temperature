@@ -53,8 +53,14 @@ module.exports = function (app) {
             key: {
               type: 'string',
               title: 'Signal K Key',
-              description: 'This is used to build the path in Signal K. It will be appended to \'environment\'',
+              description: 'This is used to build the path in Signal K. It will be appended to \'environment\'. Ignored when a full path is set below',
               default: 'inside.engineroom.temperature'
+            },
+            path: {
+              type: 'string',
+              title: 'Signal K Path',
+              description: 'Full Signal K path for this sensor, for example \'propulsion.0.temperature\'. Leave empty to build the path from the key above',
+              default: ''
             }
           }
         }
@@ -113,6 +119,14 @@ module.exports = function (app) {
     })
   }
   
+  // A sensor with a full path set uses it as is. Without one the key is
+  // appended to 'environment' as before, so existing configurations are
+  // unaffected.
+  function devicePath (device) {
+    if (device.path) return device.path
+    return 'environment.' + device.key
+  }
+
   function createDeltaMessage (device, temperature) {
     return {
       'context': 'vessels.' + app.selfId,
@@ -124,7 +138,7 @@ module.exports = function (app) {
           'timestamp': (new Date()).toISOString(),
           'values': [
             {
-              'path': 'environment.' + device.key,
+              'path': devicePath(device),
               'value': temperature
             }
           ]
