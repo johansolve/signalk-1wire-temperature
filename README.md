@@ -13,50 +13,65 @@ The plugin id is unchanged, so an existing `raspberry-pi-1wire` configuration
 is picked up as is. Do not run both plugins at the same time, they read the
 same sensors.
 
-## Getting Started
-
-You will need a Signal K server and a 1-wire temperature sensor to make use of this plugin.
-
-### Prerequisites
-
-You need basic understanding of installing Node applications with NPM.
-
 The Raspberry Pi is the usual host, but nothing here is specific to it. The
 plugin reads the Linux 1-wire subsystem through `/sys/bus/w1` directly, with no
-native dependencies, so it works on any Linux host with a 1-wire master, whether
-that is `w1_gpio` on an SBC, a DS9490R USB adapter via `ds2490`, or an I2C
-master via `w1_ds2482`. Sensors on every bus master are found. It does not work
-on macOS, Windows or FreeBSD, which have no `/sys/bus/w1`.
+native dependencies, so it works on any Linux host with a 1-wire master. It does
+not work on macOS, Windows or FreeBSD, which have no `/sys/bus/w1`.
 
-Readings keep the full resolution the sensor reports, 0.0625 °C at the usual 12
-bit setting. If a sensor is configured for fewer bits the plugin says so in the
-debug log.
+## Requirements
 
-Readings that fail their CRC check are discarded rather than published, as is
-the exact value 85.0000 °C, which is what a DS18B20 holds after a power-on reset
-when the conversion never ran. That value passes CRC, so a sensor stuck there
-would otherwise be published indefinitely as a plausible hot reading. The cost
-is that a genuine reading of exactly 85.0000 °C is dropped until the temperature
-moves by one step.
+- **Linux with the 1-wire subsystem.** The plugin reads `/sys/bus/w1`, which
+  needs the `wire` and `w1_therm` kernel modules plus a driver for whichever
+  bus master you use. These ship with mainline Linux.
+- **Node 18 or later.**
+- **A 1-wire bus master**, see below.
+- **A 4.7 kΩ pull-up resistor** between the sensor data line and 3.3 V. Without
+  it the bus reads erratically or not at all.
 
-### Installing SignalK
+No special privileges are needed. The sysfs files are world readable, so the
+Signal K server reads them as its ordinary user.
 
-You can install the application with the command `npm install signalk-server`
-Get documentation for the application here:
-- https://www.npmjs.com/package/signalk-server
+### Enabling the bus on a Raspberry Pi or similar SBC
 
-### 1-Wire sensor
+Add one line to `/boot/firmware/config.txt` (`/boot/config.txt` on systems
+older than Bookworm) and reboot:
 
-You can find documentation of connecting and enabeling 1-wire sensors on your Raspberry Pi here:
-- [Domoticx Dutch manual](http://domoticx.com/raspberry-pi-temperatuur-sensor-ds18b20-uitlezen/)
-- [Connecting 1-wire](https://www.modmypi.com/blog/ds18b20-one-wire-digital-temperature-sensor-and-the-raspberry-pi)
+```
+dtoverlay=w1-gpio
+```
 
-### Enable 1-wire on Raspberry
+That puts the bus on GPIO4 (physical pin 7). Add `,gpiopin=<n>` to use another
+pin. The overlay loads `wire` and `w1_gpio` for you, and `w1_therm` is pulled in
+when a temperature sensor is found, so there is nothing to add to `/etc/modules`.
 
-You will have to enable the 1-wire protocol on the Raspberry-Pi
-- [Enable 1-wire](https://www.raspberrypi-spy.co.uk/2018/02/enable-1-wire-interface-raspberry-pi/)
+### Other bus masters
 
-### Configuration
+The bus master does not have to be a GPIO. A DS9490R USB adapter works through
+`ds2490`, and an I2C master through `w1_ds2482`, on any Linux host including
+ordinary x86 machines. Sensors on every bus master are found.
+
+### Checking that it works
+
+```
+$ ls /sys/bus/w1/devices/
+28-0121138f863c  28-3c01e0764633  w1_bus_master1
+
+$ cat /sys/bus/w1/devices/28-3c01e0764633/w1_slave
+2b 01 55 05 7f a5 81 66 cf : crc=cf YES
+2b 01 55 05 7f a5 81 66 cf t=18687
+```
+
+Each `<family>-<serial>` directory is a sensor, and `t=` is the temperature in
+millidegrees. If only the bus master shows up, the wiring or the pull-up is the
+place to look. If nothing shows up at all, the overlay is not loaded, which
+`lsmod | grep -E '^w1|^wire'` will confirm.
+
+### Wiring references
+
+- [Enable the 1-wire interface](https://www.raspberrypi-spy.co.uk/2018/02/enable-1-wire-interface-raspberry-pi/)
+- [Connecting a DS18B20](https://www.modmypi.com/blog/ds18b20-one-wire-digital-temperature-sensor-and-the-raspberry-pi)
+
+## Configuration
 
 Each detected sensor is listed in the plugin configuration with these settings:
 
@@ -69,7 +84,24 @@ Existing configurations keep working unchanged: sensors without a **Signal K Pat
 
 Temperatures are published in Kelvin and the plugin sets `units` on each path, so displays can convert to the unit of your choice.
 
-### Building examples
+## Readings
+
+Readings keep the full resolution the sensor reports, 0.0625 °C at the usual 12
+bit setting. If a sensor is configured for fewer bits the plugin says so in the
+debug log.
+
+Readings that fail their CRC check are discarded rather than published, as is
+the exact value 85.0000 °C, which is what a DS18B20 holds after a power-on reset
+when the conversion never ran. That value passes CRC, so a sensor stuck there
+would otherwise be published indefinitely as a plausible hot reading. The cost
+is that a genuine reading of exactly 85.0000 °C is dropped until the temperature
+moves by one step.
+
+A 12 bit conversion takes 750 ms per sensor and the bus is serial, so the sample
+rate has a floor of roughly one second per sensor. A cycle that is still running
+when the next one falls due is skipped rather than queued.
+
+## Building examples
 
 - ![alt BreadBoard Example](https://raw.githubusercontent.com/johansolve/signalk-1wire-temperature/master/examples/raspberry-breadboard-1wire.jpg)
 

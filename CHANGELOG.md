@@ -38,6 +38,8 @@ that Node 18 is now required. The configuration itself is backwards compatible.
 - Sensor enumeration is retried when the bus is not readable yet, rather than
   leaving the plugin dead until it is restarted by hand.
 - Test suite and CI across Node 18, 20 and 22.
+- A documented list of what the bus actually requires, how to enable it, and
+  how to verify it, replacing three external links of which one was dead.
 
 ### Changed
 
