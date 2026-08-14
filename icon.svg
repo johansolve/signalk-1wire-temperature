@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="1-Wire">
+  <title>1-Wire</title>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1f3a5f"/>
+      <stop offset="1" stop-color="#0e5c63"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="512" height="512" rx="112" fill="url(#bg)"/>
+
+  <!-- 1W monogram, drawn as strokes so it needs no font.
+       Spans x 104 to 408 including the round caps, centred on 256. -->
+  <g fill="none" stroke="#ffffff" stroke-width="40"
+     stroke-linecap="round" stroke-linejoin="round">
+    <path d="M124 186 L160 158 L160 310"/>
+    <path d="M208 158 L250 310 L298 194 L346 310 L388 158"/>
+  </g>
+
+  <!-- The single wire the bus is named after, running the full width so it
+       reads as carrying on past the icon, with slaves tapped off along it.
+       Butt caps, so the stroke ends flush with the edge instead of overhanging.
+       At this height the rounded corners have not started, so the shape is
+       still full width and nothing spills out.
+
+       The three slaves sit directly below the feet of the monogram: the stem of
+       the 1 at x=160, and the two lower points of the W at x=250 and x=346. -->
+  <g fill="#5fd3c4">
+    <path d="M0 362 H512" fill="none" stroke="#5fd3c4" stroke-width="14" stroke-linecap="butt"/>
+    <circle cx="160" cy="362" r="14"/>
+    <circle cx="250" cy="362" r="14"/>
+    <circle cx="346" cy="362" r="14"/>
+  </g>
+</svg>

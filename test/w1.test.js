@@ -1,5 +1,6 @@
 'use strict'
 
+const { describe, it, beforeEach, afterEach } = require('node:test')
 const assert = require('assert')
 const fs = require('fs')
 const os = require('os')
@@ -12,18 +13,21 @@ const REAL = '2b 01 55 05 7f a5 81 66 cf : crc=cf YES\n' +
              '2b 01 55 05 7f a5 81 66 cf t=18687\n'
 const CRC_FAIL = '2b 01 55 05 7f a5 81 66 cf : crc=cf NO\n' +
                  '2b 01 55 05 7f a5 81 66 cf t=18687\n'
-const POWER_ON = '50 05 4b 46 7f ff 0c 10 1c : crc=1c YES\n' +
-                 '50 05 4b 46 7f ff 0c 10 1c t=85000\n'
 const NEGATIVE = 'ce fe 4b 46 7f ff 02 10 0c : crc=0c YES\n' +
                  'ce fe 4b 46 7f ff 02 10 0c t=-5062\n'
+// A slave that never answers: CRC8 over nine zero bytes is zero, so the kernel
+// marks this good and decodes it as 0 C.
+const ALL_ZERO = '00 00 00 00 00 00 00 00 00 : crc=00 YES\n' +
+                 '00 00 00 00 00 00 00 00 00 t=0\n'
+const NO_TEMPERATURE = '2b 01 55 05 7f a5 81 66 cf : crc=cf YES\n' +
+                       '2b 01 55 05 7f a5 81 66 cf\n'
 
 let root
 
-function sensorDir (id, slave, resolution) {
+function sensorDir (id, slave) {
   const dir = path.join(root, id)
   fs.mkdirSync(dir, { recursive: true })
   if (slave !== undefined) fs.writeFileSync(path.join(dir, 'w1_slave'), slave)
-  if (resolution !== undefined) fs.writeFileSync(path.join(dir, 'resolution'), resolution)
 }
 
 beforeEach(function () {
@@ -48,183 +52,182 @@ describe('parseW1Slave', function () {
     assert.throws(() => w1.parseW1Slave(CRC_FAIL, '28-abc'), /CRC check failed/)
   })
 
-  it('rejects the 85 C power-on value even though it passes CRC', function () {
-    assert.throws(() => w1.parseW1Slave(POWER_ON, '28-abc'), /power-on value/)
+  it('separates a missing CRC status from a failed one', function () {
+    // both used to be reported as a CRC failure, which sent anyone debugging a
+    // truncated file looking for a wiring fault
+    assert.throws(() => w1.parseW1Slave('', '28-abc'), /no CRC status/)
   })
 
-  it('rejects a file with no temperature in it', function () {
-    assert.throws(() => w1.parseW1Slave('YES but nothing else\n', '28-abc'), /no temperature/)
+  it('rejects a scratchpad of nothing but zeroes', function () {
+    // the CRC passes and it decodes as a believable 0 C, forever
+    assert.throws(() => w1.parseW1Slave(ALL_ZERO, '28-abc'), /all-zero scratchpad/)
   })
 
-  it('resolves steps finer than the old 0.1 degree rounding', function () {
-    const a = w1.parseW1Slave(REAL.replace('t=18687', 't=18687'), '28-abc')
-    const b = w1.parseW1Slave(REAL.replace('t=18687', 't=18625'), '28-abc')
-    assert.strictEqual(Number((a - b).toFixed(4)), 0.062)
+  it('rejects the 85 C power-on value', function () {
+    const powerOn = REAL.replace('t=18687', 't=85000')
+    assert.throws(() => w1.parseW1Slave(powerOn, '28-abc'), /power-on value/)
+  })
+
+  it('accepts a genuine 85.0625 C, which is not the power-on value', function () {
+    assert.strictEqual(w1.parseW1Slave(REAL.replace('t=18687', 't=85062'), '28-abc'), 85.062)
+  })
+
+  it('rejects a temperature the part cannot measure', function () {
+    assert.throws(() => w1.parseW1Slave(REAL.replace('t=18687', 't=200000'), '28-abc'),
+      /outside the specified range/)
+    assert.throws(() => w1.parseW1Slave(REAL.replace('t=18687', 't=-60000'), '28-abc'),
+      /outside the specified range/)
+  })
+
+  it('rejects a file with no temperature line', function () {
+    assert.throws(() => w1.parseW1Slave(NO_TEMPERATURE, '28-abc'), /no temperature reported/)
+  })
+
+  it('rejects a temperature line with rubbish after the digits', function () {
+    // parseInt would silently truncate this to a plausible reading
+    assert.throws(() => w1.parseW1Slave(REAL.replace('t=18687', 't=18687x'), '28-abc'),
+      /no temperature reported/)
+  })
+
+  it('names the sensor in every message it throws', function () {
+    assert.throws(() => w1.parseW1Slave(CRC_FAIL, '28-000000000001'), /28-000000000001/)
   })
 })
 
-describe('applyCalibration', function () {
-  it('adds the offset to the reading', function () {
-    assert.strictEqual(w1.applyCalibration(18.5, 2), 20.5)
+describe('sampleInterval', function () {
+  it('falls back on the default for a rate that is missing or unusable', function () {
+    // the server hands the plugin the raw config, so these really do arrive
+    const fallback = w1.DEFAULT_RATE_SECONDS * 1000
+    assert.strictEqual(w1.sampleInterval(undefined), fallback)
+    assert.strictEqual(w1.sampleInterval(null), fallback)
+    assert.strictEqual(w1.sampleInterval('10 sek'), fallback)
+    assert.strictEqual(w1.sampleInterval(''), fallback)
+    assert.strictEqual(w1.sampleInterval({}), fallback)
+    assert.strictEqual(w1.sampleInterval(NaN), fallback)
+    assert.strictEqual(w1.sampleInterval(0), fallback)
+    assert.strictEqual(w1.sampleInterval(-5), fallback)
   })
 
-  it('applies a negative offset', function () {
-    assert.strictEqual(w1.applyCalibration(18.5, -0.5), 18)
+  it('refuses a rate that would overflow the timer', function () {
+    // over 2^31 ms Node runs the timeout immediately, once a millisecond
+    assert.strictEqual(w1.sampleInterval(1e9), w1.DEFAULT_RATE_SECONDS * 1000)
+    assert.strictEqual(w1.sampleInterval('1e400'), w1.DEFAULT_RATE_SECONDS * 1000)
   })
 
-  it('accepts an offset that arrived from the config as a string', function () {
-    assert.strictEqual(w1.applyCalibration(18.5, '2'), 20.5)
-    assert.strictEqual(w1.applyCalibration(18.5, '-0.5'), 18)
-  })
-
-  it('leaves the reading alone when no offset is configured', function () {
-    assert.strictEqual(w1.applyCalibration(18.5, undefined), 18.5)
-    assert.strictEqual(w1.applyCalibration(18.5, null), 18.5)
-    assert.strictEqual(w1.applyCalibration(18.5, ''), 18.5)
-    assert.strictEqual(w1.applyCalibration(18.5, 0), 18.5)
-  })
-
-  it('never turns a reading into NaN, whatever the config holds', function () {
-    for (const junk of ['abc', {}, [], NaN, Infinity, -Infinity, true]) {
-      const result = w1.applyCalibration(18.5, junk)
-      assert.ok(Number.isFinite(result), 'offset ' + JSON.stringify(junk) + ' gave ' + result)
-      assert.strictEqual(result, 18.5)
-    }
-  })
-
-  it('keeps sub-step resolution rather than rounding the correction away', function () {
-    assert.strictEqual(w1.applyCalibration(18.687, 0.0625), 18.7495)
-  })
-
-  it('ignores a decimal comma instead of truncating it to zero', function () {
-    // parseFloat('0,5') is 0, which would look like a configured no-op
-    assert.strictEqual(w1.parseCalibration('0,5'), null)
-    assert.strictEqual(w1.applyCalibration(18.5, '0,5'), 18.5)
-  })
-
-  it('ignores a partly numeric offset instead of truncating it', function () {
-    for (const junk of ['2abc', '5%', '2 degrees', '0x10', '- 2', 'Infinity', '1e400']) {
-      assert.strictEqual(w1.parseCalibration(junk), null, junk)
-    }
+  it('takes a usable rate, as a number or as the string the form may save', function () {
+    assert.strictEqual(w1.sampleInterval(30), 30000)
+    assert.strictEqual(w1.sampleInterval('30'), 30000)
+    assert.strictEqual(w1.sampleInterval(' 2.5 '), 2500)
   })
 })
 
 describe('parseCalibration', function () {
-  it('separates an absent offset from an unusable one', function () {
-    // absent is not a mistake, unusable is, and only one of them gets reported
+  it('treats an absent offset as no correction rather than as a mistake', function () {
     assert.strictEqual(w1.parseCalibration(undefined), 0)
     assert.strictEqual(w1.parseCalibration(null), 0)
     assert.strictEqual(w1.parseCalibration(''), 0)
-    assert.strictEqual(w1.parseCalibration('   '), 0)
-    assert.strictEqual(w1.parseCalibration('abc'), null)
-    assert.strictEqual(w1.parseCalibration({}), null)
-    assert.strictEqual(w1.parseCalibration(NaN), null)
   })
 
-  it('accepts the numeric forms a config can hold', function () {
-    assert.strictEqual(w1.parseCalibration(2), 2)
+  it('takes a correction as a number or as a string', function () {
     assert.strictEqual(w1.parseCalibration(-0.4), -0.4)
     assert.strictEqual(w1.parseCalibration('2'), 2)
-    assert.strictEqual(w1.parseCalibration(' -0.5 '), -0.5)
-    assert.strictEqual(w1.parseCalibration('+1.5'), 1.5)
-    assert.strictEqual(w1.parseCalibration('.5'), 0.5)
-    assert.strictEqual(w1.parseCalibration('2.'), 2)
+  })
+
+  it('refuses a value that is not a number', function () {
+    // '0,5' reads as 0 through parseFloat, which applies a correction nobody asked for
+    assert.strictEqual(w1.parseCalibration('0,5'), null)
+    assert.strictEqual(w1.parseCalibration('2abc'), null)
+    assert.strictEqual(w1.parseCalibration({}), null)
+  })
+
+  it('refuses a correction that is a typo rather than a calibration', function () {
+    assert.strictEqual(w1.parseCalibration(273.15), null)
+    assert.strictEqual(w1.parseCalibration(50), 50)
+  })
+})
+
+describe('applyCalibration', function () {
+  it('shifts the reading without rounding it back to the sensor step', function () {
+    assert.strictEqual(w1.applyCalibration(18.687, 0.5), 19.187)
+  })
+
+  it('leaves the reading alone when there is no usable correction', function () {
+    assert.strictEqual(w1.applyCalibration(18.687, undefined), 18.687)
+    assert.strictEqual(w1.applyCalibration(18.687, '0,5'), 18.687)
+  })
+
+  it('discards a reading the correction pushes out of range', function () {
+    // the raw reading is range checked and the corrected one never was, so a
+    // sensor at -55 with an offset of -50 published -105
+    assert.strictEqual(w1.applyCalibration(-55, -50), null)
+    assert.strictEqual(w1.applyCalibration(125, 10), null)
   })
 })
 
 describe('isTemperatureSensor', function () {
-  it('accepts every temperature family', function () {
-    for (const family of w1.SENSOR_FAMILIES) {
-      assert.ok(w1.isTemperatureSensor(family + '-0121138f863c'), family)
-    }
+  it('accepts every family that reports a temperature', function () {
+    w1.SENSOR_FAMILIES.forEach(function (family) {
+      assert.ok(w1.isTemperatureSensor(family + '-000000000001'), family)
+    })
   })
 
-  it('rejects bus masters and non-temperature families', function () {
+  it('rejects the bus master and anything else in the directory', function () {
     assert.ok(!w1.isTemperatureSensor('w1_bus_master1'))
-    assert.ok(!w1.isTemperatureSensor('w1_bus_master2'))
-    assert.ok(!w1.isTemperatureSensor('05-000000000000'))
-    assert.ok(!w1.isTemperatureSensor('28-tooshort'))
+    assert.ok(!w1.isTemperatureSensor('05-000000000001'))
+    assert.ok(!w1.isTemperatureSensor('28-0001'))
+    assert.ok(!w1.isTemperatureSensor('28-00000000000G'))
   })
 })
 
 describe('listSensors', function () {
-  it('finds sensors across every bus master and skips the masters themselves', function (done) {
-    sensorDir('28-3c01e0764633', REAL)
-    sensorDir('28-0121138f863c', REAL)
-    sensorDir('10-00080283a977', REAL)
+  it('finds sensors on every bus master and ignores everything else', function (t, done) {
+    sensorDir('28-000000000001', REAL)
+    sensorDir('10-000000000002', REAL)
     fs.mkdirSync(path.join(root, 'w1_bus_master1'))
     fs.mkdirSync(path.join(root, 'w1_bus_master2'))
-
     w1.listSensors(root, function (err, ids) {
       assert.ifError(err)
-      assert.deepStrictEqual(ids.sort(), [
-        '10-00080283a977', '28-0121138f863c', '28-3c01e0764633'
-      ])
+      assert.deepStrictEqual(ids.sort(), ['10-000000000002', '28-000000000001'])
       done()
     })
   })
 
-  it('reports a missing bus root instead of throwing', function (done) {
-    w1.listSensors(path.join(root, 'nope'), function (err, ids) {
+  it('reports a bus root that is not there', function (t, done) {
+    w1.listSensors(path.join(root, 'nope'), function (err) {
       assert.ok(err)
-      assert.strictEqual(ids, undefined)
       done()
     })
   })
 })
 
 describe('readTemperature', function () {
-  it('reads a sensor from the bus', function (done) {
-    sensorDir('28-3c01e0764633', REAL)
-    w1.readTemperature(root, '28-3c01e0764633', function (err, value) {
+  it('reads a sensor off the bus', function (t, done) {
+    sensorDir('28-000000000001', REAL)
+    w1.readTemperature(root, '28-000000000001', function (err, value) {
       assert.ifError(err)
       assert.strictEqual(value, 18.687)
       done()
     })
   })
 
-  it('passes a read error through instead of yielding a value', function (done) {
-    w1.readTemperature(root, '28-missing', function (err, value) {
+  it('reports a sensor whose file has gone', function (t, done) {
+    w1.readTemperature(root, '28-000000000001', function (err) {
       assert.ok(err)
-      assert.strictEqual(value, undefined)
       done()
     })
   })
 
-  it('passes a CRC failure through as an error', function (done) {
-    sensorDir('28-3c01e0764633', CRC_FAIL)
-    w1.readTemperature(root, '28-3c01e0764633', function (err, value) {
-      assert.ok(err)
-      assert.strictEqual(value, undefined)
-      done()
-    })
-  })
-})
-
-describe('readResolution', function () {
-  it('reads the configured resolution', function (done) {
-    sensorDir('28-3c01e0764633', REAL, '12\n')
-    w1.readResolution(root, '28-3c01e0764633', function (err, bits) {
-      assert.ifError(err)
-      assert.strictEqual(bits, 12)
+  it('reports a file it could read but not decode', function (t, done) {
+    sensorDir('28-000000000001', CRC_FAIL)
+    w1.readTemperature(root, '28-000000000001', function (err) {
+      assert.match(err.message, /CRC check failed/)
       done()
     })
   })
 
-  it('treats a missing resolution file as unknown, not an error', function (done) {
-    sensorDir('28-3c01e0764633', REAL)
-    w1.readResolution(root, '28-3c01e0764633', function (err, bits) {
-      assert.ifError(err)
-      assert.strictEqual(bits, null)
-      done()
-    })
-  })
-
-  it('treats unparsable contents as unknown', function (done) {
-    sensorDir('28-3c01e0764633', REAL, 'nonsense\n')
-    w1.readResolution(root, '28-3c01e0764633', function (err, bits) {
-      assert.ifError(err)
-      assert.strictEqual(bits, null)
+  it('refuses an id that is not a sensor id rather than joining it into a path', function (t, done) {
+    w1.readTemperature(root, '../../etc/passwd', function (err) {
+      assert.match(err.message, /not a 1-wire sensor id/)
       done()
     })
   })

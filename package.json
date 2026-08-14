@@ -1,22 +1,27 @@
 {
   "name": "signalk-1wire-temperature",
-  "author": "Ewald van Gemert",
+  "author": "Johan S\u00f6lve",
   "contributors": [
-    "Johan Sölve"
+    "Ewald van Gemert <vangee@gmail.com>"
   ],
-  "description": "Signal K plugin that reads 1-Wire temperature sensors, with a configurable Signal K path per sensor",
+  "description": "Signal K plugin that reads 1-Wire temperature sensors, with a configurable Signal K path and calibration offset per sensor",
   "license": "Apache-2.0",
   "homepage": "https://github.com/johansolve/signalk-1wire-temperature#readme",
   "version": "2.0.0",
   "main": "index.js",
   "keywords": [
     "signalk-node-server-plugin",
+    "signalk-category-hardware",
     "signalk",
     "1-wire",
     "onewire",
     "ds18b20",
     "temperature"
   ],
+  "signalk": {
+    "displayName": "1-Wire Temperature",
+    "appIcon": "./icon.svg"
+  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/johansolve/signalk-1wire-temperature.git"
@@ -27,27 +32,24 @@
   "engines": {
     "node": ">=18"
   },
-  "os": [
-    "linux"
-  ],
   "files": [
     "index.js",
     "lib/",
+    "icon.svg",
     "README.md",
     "CHANGELOG.md",
-    "LICENSE"
+    "LICENSE",
+    "NOTICE"
   ],
-  "dependencies": {
-    "underscore": "^1.9.1"
-  },
+  "dependencies": {},
   "scripts": {
-    "test": "mocha",
-    "lint": "eslint ."
+    "test": "node --test --test-timeout=30000",
+    "lint": "eslint .",
+    "prepublishOnly": "npm run lint && npm test"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.5",
     "eslint": "^9.39.5",
-    "globals": "^17.11.0",
-    "mocha": "^11.8.0"
+    "globals": "^17.11.0"
   }
 }
