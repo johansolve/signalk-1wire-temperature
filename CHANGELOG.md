@@ -51,4 +51,4 @@ existing configuration is picked up as is.
 - Sensor enumeration and readings still in flight when the plugin is stopped no
   longer publish, and no longer duplicate the device list on restart.
 
-[1.1.0]: https://github.com/johansolve/signalk-raspberry-pi-1wire/releases/tag/v1.1.0
+[1.1.0]: https://github.com/johansolve/signalk-1wire-temperature/releases/tag/v1.1.0

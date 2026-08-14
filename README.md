@@ -71,12 +71,12 @@ Temperatures are published in Kelvin and the plugin sets `units` on each path, s
 
 ### Building examples
 
-- ![alt BreadBoard Example](https://raw.githubusercontent.com/johansolve/signalk-raspberry-pi-1wire/master/examples/raspberry-breadboard-1wire.jpg)
+- ![alt BreadBoard Example](https://raw.githubusercontent.com/johansolve/signalk-1wire-temperature/master/examples/raspberry-breadboard-1wire.jpg)
 
 You can use a ISDN splitter to house a sensor, and plugin two more sensors. You will need to alter and solder the PCB.
 
-- ![alt ISDN splitter internals](https://raw.githubusercontent.com/johansolve/signalk-raspberry-pi-1wire/master/examples/raspberry-1wire-from-isdn-splitter.jpg)
-- ![alt ISDN splitter](https://raw.githubusercontent.com/johansolve/signalk-raspberry-pi-1wire/master/examples/raspberry-1wire-from-isdn-splitter2.jpg)
+- ![alt ISDN splitter internals](https://raw.githubusercontent.com/johansolve/signalk-1wire-temperature/master/examples/raspberry-1wire-from-isdn-splitter.jpg)
+- ![alt ISDN splitter](https://raw.githubusercontent.com/johansolve/signalk-1wire-temperature/master/examples/raspberry-1wire-from-isdn-splitter2.jpg)
 
 ## Contributing
 
@@ -84,7 +84,7 @@ Please read [Readme.md](https://github.com/SignalK/signalk-server-node) for deta
 
 ## Versioning
 
-We use [SemVer](http://semver.org/) for versioning. For the versions available, see the [tags on this repository](https://github.com/johansolve/signalk-raspberry-pi-1wire/tags).
+We use [SemVer](http://semver.org/) for versioning. For the versions available, see the [tags on this repository](https://github.com/johansolve/signalk-1wire-temperature/tags).
 
 ## Authors
 
