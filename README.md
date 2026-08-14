@@ -22,11 +22,22 @@ You will need a Signal K server and a 1-wire temperature sensor to make use of t
 You need basic understanding of installing Node applications with NPM.
 
 Despite the name, nothing here is specific to the Raspberry Pi. The plugin reads
-the Linux 1-wire subsystem through `/sys/bus/w1`, so it works on any Linux host
-with a 1-wire master, whether that is `w1_gpio` on an SBC, a DS9490R USB adapter
-via `ds2490`, or an I2C master via `w1_ds2482`. It does not work on macOS,
-Windows or FreeBSD, which have no `/sys/bus/w1`. Note that only the first bus
-master (`w1_bus_master1`) is read.
+the Linux 1-wire subsystem through `/sys/bus/w1` directly, with no native
+dependencies, so it works on any Linux host with a 1-wire master, whether that
+is `w1_gpio` on an SBC, a DS9490R USB adapter via `ds2490`, or an I2C master via
+`w1_ds2482`. Sensors on every bus master are found. It does not work on macOS,
+Windows or FreeBSD, which have no `/sys/bus/w1`.
+
+Readings keep the full resolution the sensor reports, 0.0625 °C at the usual 12
+bit setting. If a sensor is configured for fewer bits the plugin says so in the
+debug log.
+
+Readings that fail their CRC check are discarded rather than published, as is
+the exact value 85.0000 °C, which is what a DS18B20 holds after a power-on reset
+when the conversion never ran. That value passes CRC, so a sensor stuck there
+would otherwise be published indefinitely as a plausible hot reading. The cost
+is that a genuine reading of exactly 85.0000 °C is dropped until the temperature
+moves by one step.
 
 ### Installing SignalK
 

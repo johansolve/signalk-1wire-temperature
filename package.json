@@ -4,13 +4,18 @@
   "contributors": [
     "Johan Sölve"
   ],
-  "description": "SignalK node server plugin that reads 1-Wire temperature sensors, with a configurable Signal K path per sensor",
+  "description": "Signal K plugin that reads 1-Wire temperature sensors, with a configurable Signal K path per sensor",
   "license": "ISC",
   "homepage": "https://github.com/johansolve/signalk-raspberry-pi-1wire#readme",
   "version": "1.1.0",
   "main": "index.js",
   "keywords": [
-    "signalk-node-server-plugin"
+    "signalk-node-server-plugin",
+    "signalk",
+    "1-wire",
+    "onewire",
+    "ds18b20",
+    "temperature"
   ],
   "repository": {
     "type": "git",
@@ -19,11 +24,30 @@
   "bugs": {
     "url": "https://github.com/johansolve/signalk-raspberry-pi-1wire/issues"
   },
+  "engines": {
+    "node": ">=18"
+  },
+  "os": [
+    "linux"
+  ],
+  "files": [
+    "index.js",
+    "lib/",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE"
+  ],
   "dependencies": {
-    "ds18b20": "^0.1.0",
     "underscore": "^1.9.1"
   },
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "mocha",
+    "lint": "eslint ."
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.5",
+    "eslint": "^9.39.5",
+    "globals": "^17.11.0",
+    "mocha": "^11.8.0"
   }
 }

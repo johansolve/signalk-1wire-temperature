@@ -1,9 +1,10 @@
 /*
  * Copyright 2019 Ewald van Gemert <vangee@gmail.com>
  *
- * This file has been modified from the original. Changes in this fork:
- * an optional full Signal K path per sensor, and meta published with units
- * and displayName. See the repository history for details.
+ * This file has been modified from the original. In this fork the sensors are
+ * read from /sys/bus/w1 directly instead of through the ds18b20 library, each
+ * sensor can be given a full Signal K path, and meta is published with units
+ * and displayName. See CHANGELOG.md for the full list.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,25 +20,31 @@
  */
 
 const _ = require('underscore')
-const _ds18b20 = require('ds18b20')
+const w1 = require('./lib/w1')
+
+const W1_DEVICES = w1.W1_DEVICES
+const RETRY_INTERVAL = 30000
 
 module.exports = function (app) {
   let _deviceList = [];
   let _timer = null;
   let _generation = 0;
+  let _pending = 0;
   let plugin = {}
 
   plugin.id = 'raspberry-pi-1wire'
-  plugin.name = 'Raspberry-Pi 1-Wire'
-  plugin.description = '1-Wire temperature sensors on Raspberry-Pi'
+  plugin.name = '1-Wire Temperature'
+  plugin.description = '1-Wire temperature sensors through the Linux 1-wire subsystem'
 
   plugin.schema = {
     type: 'object',
     properties: {
       rate: {
         title: "Sample Rate (in seconds)",
+        description: 'A 12 bit conversion takes 750 ms per sensor and the bus is serial, so keep this above roughly one second per sensor. A cycle that is still running when the next one is due is skipped.',
         type: 'number',
-        default: 30
+        minimum: 1,
+        default: 10
       },
       devices: {
         type: 'array',
@@ -80,8 +87,17 @@ module.exports = function (app) {
     _deviceList = []
     var generation = ++_generation
 
-    _ds18b20.sensors(function (err, ids) {
+    w1.listSensors(W1_DEVICES, function (err, ids) {
       if (generation !== _generation) return
+      if (err) {
+        // the w1 modules may still be probing when the server starts, so keep
+        // looking instead of staying dead until someone restarts the plugin
+        app.setPluginError('cannot read ' + W1_DEVICES + ': ' + err.message)
+        _timer = setTimeout(function () {
+          if (generation === _generation) plugin.start(options)
+        }, RETRY_INTERVAL)
+        return
+      }
 
       var saveOptions = false
       _.each(ids, function (id) {
@@ -105,9 +121,28 @@ module.exports = function (app) {
       }
 
       sendMetas()
+      reportResolution(generation)
 
-      measureTemperatures()
-      _timer = setInterval(measureTemperatures, options.rate * 1000)
+      measureTemperatures(generation)
+      _timer = setInterval(function () {
+        measureTemperatures(generation)
+      }, options.rate * 1000)
+    })
+  }
+
+  // A sensor at less than 12 bits silently costs precision, so say so once.
+  function reportResolution (generation) {
+    _.each(_deviceList, function (device) {
+      w1.readResolution(W1_DEVICES, device.oneWireId, function (err, bits) {
+        if (generation !== _generation) return
+        if (bits === null) return
+        if (bits < 12) {
+          app.debug('sensor ' + device.oneWireId + ' is set to ' + bits +
+            ' bit resolution, so readings are coarser than 0.0625 degrees')
+        } else {
+          app.debug('sensor ' + device.oneWireId + ' is set to ' + bits + ' bit resolution')
+        }
+      })
     })
   }
 
@@ -120,7 +155,15 @@ module.exports = function (app) {
     }
   }
 
-  function measureTemperatures() {
+  function measureTemperatures(generation) {
+    // each read occupies a threadpool thread for the whole conversion and the
+    // bus is serial, so a slow cycle must not stack another batch on top
+    if (_pending > 0) {
+      app.debug('previous cycle still running with ' + _pending +
+        ' reads outstanding, skipping this one')
+      return
+    }
+
     _.each(_deviceList, function (device) {
       // skip sensors that have neither a path nor a key configured
       if (!devicePath(device)) {
@@ -128,7 +171,15 @@ module.exports = function (app) {
         return
       }
       // measure temperature
-      _ds18b20.temperature(device.oneWireId, function (err, value) {
+      _pending++
+      w1.readTemperature(W1_DEVICES, device.oneWireId, function (err, value) {
+        _pending--
+        if (generation !== _generation) return
+        // a failed read must not be published as NaN
+        if (err) {
+          app.debug(err.message)
+          return
+        }
         var temperature = value + 273.15
         // create message
         var delta = createDeltaMessage(device, temperature)
@@ -148,12 +199,15 @@ module.exports = function (app) {
     var metas = _.filter(_.map(_deviceList, function (device) {
       var path = devicePath(device)
       if (!path) return null
+      var meta = { 'units': 'K' }
+      // an untouched auto-generated name is the bare sensor id, which is a
+      // worse label than whatever Signal K already knows the path by
+      if (device.locationName && device.locationName !== generatedName(device.oneWireId)) {
+        meta.displayName = device.locationName
+      }
       return {
         'path': path,
-        'value': {
-          'units': 'K',
-          'displayName': device.locationName
-        }
+        'value': meta
       }
     }), function (meta) {
       return meta !== null
@@ -189,10 +243,14 @@ module.exports = function (app) {
     }
   }
 
+  function generatedName (id) {
+    return 'Sensor ' + id
+  }
+
   function newSensor (id) {
     return {
       'oneWireId': id,
-      'locationName': 'Sensor ' + id,
+      'locationName': generatedName(id),
       'key': 'inside.' + id + '.temperature'
     }
   }
