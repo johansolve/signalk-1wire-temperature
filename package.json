@@ -7,7 +7,7 @@
   "description": "Signal K plugin that reads 1-Wire temperature sensors, with a configurable Signal K path per sensor",
   "license": "Apache-2.0",
   "homepage": "https://github.com/johansolve/signalk-1wire-temperature#readme",
-  "version": "1.1.0",
+  "version": "2.0.0",
   "main": "index.js",
   "keywords": [
     "signalk-node-server-plugin",
