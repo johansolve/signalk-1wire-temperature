@@ -73,6 +73,12 @@ module.exports = function (app) {
               title: 'Signal K Path',
               description: 'Full Signal K path for this sensor, for example \'propulsion.0.temperature\' or \'electrical.alternators.0.temperature\'. Leave empty to fall back on the deprecated key above.',
               default: ''
+            },
+            offset: {
+              type: 'number',
+              title: 'Calibration offset',
+              description: 'Added to every reading from this sensor. A kelvin and a degree Celsius are the same size, so enter the correction in degrees, for example 2 or -0.4. Use it when a sensor reads consistently high or low, which is usually down to where it is mounted rather than to the chip. Leave at 0 for no correction.',
+              default: 0
             }
           }
         }
@@ -122,6 +128,7 @@ module.exports = function (app) {
 
       sendMetas()
       reportResolution(generation)
+      reportCalibration()
 
       measureTemperatures(generation)
       _timer = setInterval(function () {
@@ -143,6 +150,24 @@ module.exports = function (app) {
           app.debug('sensor ' + device.oneWireId + ' is set to ' + bits + ' bit resolution')
         }
       })
+    })
+  }
+
+  // A calibration offset shifts every reading from a sensor without leaving any
+  // other trace, so name the ones that are active. An offset that could not be
+  // read as a number is worse than one that is missing, because the sensor looks
+  // calibrated and is not, so that one is an error rather than a debug line.
+  function reportCalibration () {
+    _.each(_deviceList, function (device) {
+      var offset = w1.parseCalibration(device.offset)
+      if (offset === null) {
+        app.error('sensor ' + device.oneWireId + ' has a calibration offset of ' +
+          JSON.stringify(device.offset) + ' that is not a number, so no correction ' +
+          'is applied. Use a decimal point rather than a comma.')
+      } else if (offset !== 0) {
+        app.debug('sensor ' + device.oneWireId + ' has a calibration offset of ' +
+          offset + ' applied to every reading')
+      }
     })
   }
 
@@ -180,7 +205,7 @@ module.exports = function (app) {
           app.debug(err.message)
           return
         }
-        var temperature = value + 273.15
+        var temperature = w1.applyCalibration(value, device.offset) + 273.15
         // create message
         var delta = createDeltaMessage(device, temperature)
         // send temperature
@@ -251,7 +276,8 @@ module.exports = function (app) {
     return {
       'oneWireId': id,
       'locationName': generatedName(id),
-      'key': 'inside.' + id + '.temperature'
+      'key': 'inside.' + id + '.temperature',
+      'offset': 0
     }
   }
 

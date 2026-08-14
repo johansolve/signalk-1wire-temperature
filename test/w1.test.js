@@ -63,6 +63,75 @@ describe('parseW1Slave', function () {
   })
 })
 
+describe('applyCalibration', function () {
+  it('adds the offset to the reading', function () {
+    assert.strictEqual(w1.applyCalibration(18.5, 2), 20.5)
+  })
+
+  it('applies a negative offset', function () {
+    assert.strictEqual(w1.applyCalibration(18.5, -0.5), 18)
+  })
+
+  it('accepts an offset that arrived from the config as a string', function () {
+    assert.strictEqual(w1.applyCalibration(18.5, '2'), 20.5)
+    assert.strictEqual(w1.applyCalibration(18.5, '-0.5'), 18)
+  })
+
+  it('leaves the reading alone when no offset is configured', function () {
+    assert.strictEqual(w1.applyCalibration(18.5, undefined), 18.5)
+    assert.strictEqual(w1.applyCalibration(18.5, null), 18.5)
+    assert.strictEqual(w1.applyCalibration(18.5, ''), 18.5)
+    assert.strictEqual(w1.applyCalibration(18.5, 0), 18.5)
+  })
+
+  it('never turns a reading into NaN, whatever the config holds', function () {
+    for (const junk of ['abc', {}, [], NaN, Infinity, -Infinity, true]) {
+      const result = w1.applyCalibration(18.5, junk)
+      assert.ok(Number.isFinite(result), 'offset ' + JSON.stringify(junk) + ' gave ' + result)
+      assert.strictEqual(result, 18.5)
+    }
+  })
+
+  it('keeps sub-step resolution rather than rounding the correction away', function () {
+    assert.strictEqual(w1.applyCalibration(18.687, 0.0625), 18.7495)
+  })
+
+  it('ignores a decimal comma instead of truncating it to zero', function () {
+    // parseFloat('0,5') is 0, which would look like a configured no-op
+    assert.strictEqual(w1.parseCalibration('0,5'), null)
+    assert.strictEqual(w1.applyCalibration(18.5, '0,5'), 18.5)
+  })
+
+  it('ignores a partly numeric offset instead of truncating it', function () {
+    for (const junk of ['2abc', '5%', '2 degrees', '0x10', '- 2', 'Infinity', '1e400']) {
+      assert.strictEqual(w1.parseCalibration(junk), null, junk)
+    }
+  })
+})
+
+describe('parseCalibration', function () {
+  it('separates an absent offset from an unusable one', function () {
+    // absent is not a mistake, unusable is, and only one of them gets reported
+    assert.strictEqual(w1.parseCalibration(undefined), 0)
+    assert.strictEqual(w1.parseCalibration(null), 0)
+    assert.strictEqual(w1.parseCalibration(''), 0)
+    assert.strictEqual(w1.parseCalibration('   '), 0)
+    assert.strictEqual(w1.parseCalibration('abc'), null)
+    assert.strictEqual(w1.parseCalibration({}), null)
+    assert.strictEqual(w1.parseCalibration(NaN), null)
+  })
+
+  it('accepts the numeric forms a config can hold', function () {
+    assert.strictEqual(w1.parseCalibration(2), 2)
+    assert.strictEqual(w1.parseCalibration(-0.4), -0.4)
+    assert.strictEqual(w1.parseCalibration('2'), 2)
+    assert.strictEqual(w1.parseCalibration(' -0.5 '), -0.5)
+    assert.strictEqual(w1.parseCalibration('+1.5'), 1.5)
+    assert.strictEqual(w1.parseCalibration('.5'), 0.5)
+    assert.strictEqual(w1.parseCalibration('2.'), 2)
+  })
+})
+
 describe('isTemperatureSensor', function () {
   it('accepts every temperature family', function () {
     for (const family of w1.SENSOR_FAMILIES) {

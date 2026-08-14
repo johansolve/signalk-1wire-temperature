@@ -79,8 +79,9 @@ Each detected sensor is listed in the plugin configuration with these settings:
 - **Location name** - a human readable name, also published as the `displayName` of the path so displays can label the value
 - **Signal K Path** - the full Signal K path for this sensor, for example `propulsion.0.temperature` or `electrical.alternators.0.temperature`
 - **Signal K Key** - deprecated. When no full path is set, this key is appended to `environment` to build the path
+- **Calibration offset** - added to every reading from this sensor, `0` for no correction
 
-Existing configurations keep working unchanged: sensors without a **Signal K Path** still publish under `environment.<key>`.
+Existing configurations keep working unchanged: sensors without a **Signal K Path** still publish under `environment.<key>`, and sensors without a **Calibration offset** are published uncorrected.
 
 Temperatures are published in Kelvin and the plugin sets `units` on each path, so displays can convert to the unit of your choice.
 
@@ -100,6 +101,33 @@ moves by one step.
 A 12 bit conversion takes 750 ms per sensor and the bus is serial, so the sample
 rate has a floor of roughly one second per sensor. A cycle that is still running
 when the next one falls due is skipped rather than queued.
+
+### Calibration
+
+Resolution is not accuracy. A DS18B20 resolves 0.0625 °C but is only specified
+to ±0.5 °C between -10 and +85 °C, and a sensor is usually further off than that
+because of where it sits rather than because of the chip: a through-hull that is
+partly warmed by the hull, a sender bolted to a block that runs hotter than the
+fluid in it.
+
+**Calibration offset** corrects that. It is added to every reading from that one
+sensor, in degrees, so `2` reads two degrees higher and `-0.4` reads slightly
+lower. A kelvin and a degree Celsius are the same size, so the number you measure
+against a reference thermometer is the number you enter, whichever unit you
+compared in. Write it with a decimal point: an offset that cannot be read as a
+number is reported in the server log and ignored, rather than being truncated
+into a value you did not intend.
+
+Correcting here rather than in a single dashboard is usually what you want. The
+offset lands before the value reaches Signal K, so every consumer sees the same
+corrected figure and the recorded history is corrected too. An offset applied in
+one chart's query corrects that chart alone and leaves every other display, and
+everything already written to a database, reading something else.
+
+Two things it will not do. It cannot rescue a sensor whose error changes with
+temperature, since a fixed offset only shifts the curve and never bends it. And
+it shifts history only from the moment it is set, so data recorded before that
+keeps the old values.
 
 ## Building examples
 

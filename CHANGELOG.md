@@ -33,6 +33,13 @@ that Node 18 is now required. The configuration itself is backwards compatible.
   [#3](https://github.com/ewaldvangemert/signalk-raspberry-pi-1wire/pull/3).
 - `displayName` is published for sensors that have been given a location name
   of their own.
+- A **Calibration offset** per sensor, added to every reading from that sensor
+  before it is published. Corrects a sensor that reads consistently high or low,
+  which is usually down to where it is mounted rather than to the chip. Applying
+  it here means every consumer and the recorded history see the same corrected
+  value, instead of the correction living in one chart's query. Sensors with no
+  offset configured are published uncorrected. An offset that cannot be read as
+  a number is reported at startup and ignored, rather than silently truncated.
 - The configured sensor resolution is reported at startup, with a warning when
   a sensor is set below 12 bits.
 - Sensor enumeration is retried when the bus is not readable yet, rather than
