@@ -1,6 +1,6 @@
-# signalk-rpi-1wire-temperature
+# signalk-1wire-temperature
 
-1-Wire temperature sensors for Signal K, typically on a Raspberry Pi.
+1-Wire temperature sensors for Signal K.
 
 This is a fork of [signalk-raspberry-pi-1wire](https://github.com/ewaldvangemert/signalk-raspberry-pi-1wire)
 by Ewald van Gemert, which has been unmaintained since 2019. It adds a
@@ -21,12 +21,12 @@ You will need a Signal K server and a 1-wire temperature sensor to make use of t
 
 You need basic understanding of installing Node applications with NPM.
 
-Despite the name, nothing here is specific to the Raspberry Pi. The plugin reads
-the Linux 1-wire subsystem through `/sys/bus/w1` directly, with no native
-dependencies, so it works on any Linux host with a 1-wire master, whether that
-is `w1_gpio` on an SBC, a DS9490R USB adapter via `ds2490`, or an I2C master via
-`w1_ds2482`. Sensors on every bus master are found. It does not work on macOS,
-Windows or FreeBSD, which have no `/sys/bus/w1`.
+The Raspberry Pi is the usual host, but nothing here is specific to it. The
+plugin reads the Linux 1-wire subsystem through `/sys/bus/w1` directly, with no
+native dependencies, so it works on any Linux host with a 1-wire master, whether
+that is `w1_gpio` on an SBC, a DS9490R USB adapter via `ds2490`, or an I2C
+master via `w1_ds2482`. Sensors on every bus master are found. It does not work
+on macOS, Windows or FreeBSD, which have no `/sys/bus/w1`.
 
 Readings keep the full resolution the sensor reports, 0.0625 °C at the usual 12
 bit setting. If a sensor is configured for fewer bits the plugin says so in the
@@ -41,7 +41,7 @@ moves by one step.
 
 ### Installing SignalK
 
-You can install the application with the command `npm install signak-server`
+You can install the application with the command `npm install signalk-server`
 Get documentation for the application here:
 - https://www.npmjs.com/package/signalk-server
 

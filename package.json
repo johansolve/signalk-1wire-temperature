@@ -1,5 +1,5 @@
 {
-  "name": "signalk-rpi-1wire-temperature",
+  "name": "signalk-1wire-temperature",
   "author": "Ewald van Gemert",
   "contributors": [
     "Johan Sölve"
