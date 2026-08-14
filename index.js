@@ -1,6 +1,10 @@
 /*
  * Copyright 2019 Ewald van Gemert <vangee@gmail.com>
  *
+ * This file has been modified from the original. Changes in this fork:
+ * an optional full Signal K path per sensor, and meta published with units
+ * and displayName. See the repository history for details.
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at

@@ -1,14 +1,32 @@
-# signalk-raspberry-pi-1wire
+# signalk-rpi-1wire-temperature
 
-1-Wire temperature sensors on Raspberry-Pi for Signal-K. This plugin is downloaded from the Signal-K application.
+1-Wire temperature sensors for Signal K, typically on a Raspberry Pi.
+
+This is a fork of [signalk-raspberry-pi-1wire](https://github.com/ewaldvangemert/signalk-raspberry-pi-1wire)
+by Ewald van Gemert, which has been unmaintained since 2019. It adds a
+configurable Signal K path per sensor ([issue #2](https://github.com/ewaldvangemert/signalk-raspberry-pi-1wire/issues/2))
+and publishes `units`, so displays no longer show raw Kelvin
+([issue #1](https://github.com/ewaldvangemert/signalk-raspberry-pi-1wire/issues/1),
+[#3](https://github.com/ewaldvangemert/signalk-raspberry-pi-1wire/pull/3)).
+
+The plugin id is unchanged, so an existing `raspberry-pi-1wire` configuration
+is picked up as is. Do not run both plugins at the same time, they read the
+same sensors.
 
 ## Getting Started
 
-You will need a Signal-K application and a 1-wire temperature sensor to make use of this plugin.
+You will need a Signal K server and a 1-wire temperature sensor to make use of this plugin.
 
 ### Prerequisites
 
-You need basic understanding of installing Node applications with NPM
+You need basic understanding of installing Node applications with NPM.
+
+Despite the name, nothing here is specific to the Raspberry Pi. The plugin reads
+the Linux 1-wire subsystem through `/sys/bus/w1`, so it works on any Linux host
+with a 1-wire master, whether that is `w1_gpio` on an SBC, a DS9490R USB adapter
+via `ds2490`, or an I2C master via `w1_ds2482`. It does not work on macOS,
+Windows or FreeBSD, which have no `/sys/bus/w1`. Note that only the first bus
+master (`w1_bus_master1`) is read.
 
 ### Installing SignalK
 
@@ -42,12 +60,12 @@ Temperatures are published in Kelvin and the plugin sets `units` on each path, s
 
 ### Building examples
 
-- ![alt BreadBoard Example](https://raw.githubusercontent.com/ewaldvangemert/signalk-raspberry-pi-1wire/master/examples/raspberry-breadboard-1wire.jpg)
+- ![alt BreadBoard Example](https://raw.githubusercontent.com/johansolve/signalk-raspberry-pi-1wire/master/examples/raspberry-breadboard-1wire.jpg)
 
 You can use a ISDN splitter to house a sensor, and plugin two more sensors. You will need to alter and solder the PCB.
 
-- ![alt ISDN splitter internals](https://raw.githubusercontent.com/ewaldvangemert/signalk-raspberry-pi-1wire/master/examples/raspberry-1wire-from-isdn-splitter.jpg)
-- ![alt ISDN splitter](https://raw.githubusercontent.com/ewaldvangemert/signalk-raspberry-pi-1wire/master/examples/raspberry-1wire-from-isdn-splitter2.jpg)
+- ![alt ISDN splitter internals](https://raw.githubusercontent.com/johansolve/signalk-raspberry-pi-1wire/master/examples/raspberry-1wire-from-isdn-splitter.jpg)
+- ![alt ISDN splitter](https://raw.githubusercontent.com/johansolve/signalk-raspberry-pi-1wire/master/examples/raspberry-1wire-from-isdn-splitter2.jpg)
 
 ## Contributing
 
@@ -55,14 +73,24 @@ Please read [Readme.md](https://github.com/SignalK/signalk-server-node) for deta
 
 ## Versioning
 
-We use [SemVer](http://semver.org/) for versioning. For the versions available, see the [tags on this repository](https://github.com/ewaldvangemert/signalk-raspberry-pi-1wire/tags).
+We use [SemVer](http://semver.org/) for versioning. For the versions available, see the [tags on this repository](https://github.com/johansolve/signalk-raspberry-pi-1wire/tags).
 
 ## Authors
 
-* **Ewald van Gemert** - *Author of this plugin*
+* **Ewald van Gemert** - *Author of the original plugin*
+* **Johan Sölve** - *Configurable paths, units, maintainer of this fork*
 
 See also the list of Signalk-server [contributors](https://github.com/SignalK/signalk-server-node/graphs/contributors) who participated in this project.
 
 ## License
 
-This project is licensed under the ISC License
+The original project declares two different licenses and ships neither as a
+file: `package.json` and this README say ISC, while the header of `index.js`
+says Apache License 2.0, copyright 2019 Ewald van Gemert. Both are permissive,
+so the difference does not restrict use, but since it is genuinely ambiguous
+this fork keeps every original notice untouched and ships the Apache 2.0 text
+as `LICENSE`, that being the only license the source itself points at. Modified
+files carry a notice of the change, as Apache 2.0 requires.
+
+If you need certainty for your own use, read both licenses. Neither imposes
+copyleft obligations.
