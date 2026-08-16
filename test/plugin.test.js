@@ -63,11 +63,24 @@ function start (app, options) {
 // Timers and the monotonic clock under the test's control. Frozen rather than
 // offset: adding real elapsed time leaves a boundary test racing the scheduler.
 function fakeClock (t) {
-  t.mock.timers.enable({ apis: ['setInterval', 'setTimeout', 'Date'] })
+  // The plugin reads performance.now(), which is patched below, so only the
+  // timers themselves need the runner's help. Node 18 and 20 take an array
+  // here; the options form, and mocking Date at all, arrived in Node 22.
+  const apis = ['setInterval', 'setTimeout']
+  try {
+    t.mock.timers.enable({ apis })
+  } catch {
+    t.mock.timers.enable(apis)
+  }
   const realNow = performance.now.bind(performance)
   let virtual = realNow()
-  performance.now = () => virtual
-  t.after(() => { performance.now = realNow })
+  // defined rather than assigned: on Node 18 performance.now is read only, and
+  // a plain assignment throws instead of taking effect
+  const useClock = now => Object.defineProperty(performance, 'now', {
+    value: now, configurable: true, writable: true
+  })
+  useClock(() => virtual)
+  t.after(() => useClock(realNow))
   return async function advance (ms) {
     virtual += ms
     t.mock.timers.tick(ms)

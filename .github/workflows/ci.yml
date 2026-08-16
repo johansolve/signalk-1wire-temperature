@@ -7,7 +7,13 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    # a hung test should end the job, not sit until the six hour default. This
+    # lives here rather than in the test script because --test-timeout is not
+    # understood by every Node version the package supports.
+    timeout-minutes: 10
     strategy:
+      # one version failing should not hide whether the others pass
+      fail-fast: false
       matrix:
         # the floor declared in engines, through to current
         node: [18, 20, 22, 24]

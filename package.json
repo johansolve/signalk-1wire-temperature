@@ -43,7 +43,7 @@
   ],
   "dependencies": {},
   "scripts": {
-    "test": "node --test --test-timeout=30000",
+    "test": "node --test",
     "lint": "eslint .",
     "prepublishOnly": "npm run lint && npm test"
   },
