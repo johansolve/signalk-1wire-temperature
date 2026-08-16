@@ -231,4 +231,24 @@ describe('readTemperature', function () {
       done()
     })
   })
+
+  it('refuses an id that merely begins like a sensor id', function (t, done) {
+    // this is the one the guard exists for. An id that fails on its first
+    // character says nothing about whether the pattern is anchored at the end,
+    // and unanchored it would happily join a traversal onto the bus root.
+    w1.readTemperature(root, '28-000000000001/../../etc/passwd', function (err) {
+      assert.match(err.message, /not a 1-wire sensor id/)
+      done()
+    })
+  })
+})
+
+describe('isTemperatureSensor', function () {
+  it('anchors the pattern at both ends', function () {
+    assert.ok(w1.isTemperatureSensor('28-000000000001'))
+    assert.ok(!w1.isTemperatureSensor('28-000000000001/../../etc/passwd'))
+    assert.ok(!w1.isTemperatureSensor('28-000000000001/w1_slave'))
+    assert.ok(!w1.isTemperatureSensor('28-0121138f863cff'), 'too long')
+    assert.ok(!w1.isTemperatureSensor('x28-000000000001'), 'leading junk')
+  })
 })

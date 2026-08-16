@@ -557,6 +557,36 @@ describe('a read that never comes back', function () {
       'abandoned chain published a value 70 s after it was read')
   })
 
+  it('does not let a straggler from a stopped run free the cycle that replaced it', async function (t) {
+    // a config save is a stop and a start, and a real read takes 750 ms, so a
+    // read outliving its run is ordinary. Letting go of a slot it no longer
+    // holds is what puts two chains on a serial bus.
+    const advance = fakeClock(t)
+    const app = fakeApp()
+    const pending = []
+    let started = 0
+    w1.readTemperature = (root, id, cb) => { started++; pending.push(cb) }
+    // two sensors, because a sensor whose read is still in flight is skipped:
+    // with only one the replacement run would have nothing left to read
+    w1.listSensors = (root, cb) => process.nextTick(cb, null, [ID, ID2])
+    const options = opts([dev(ID, { path: 'a.b' }), dev(ID2, { path: 'c.d' })])
+    await start(app, options)
+    assert.strictEqual(started, 1, 'the first run has a read outstanding')
+
+    plugin.stop()
+    plugin.start(options)
+    await drain()
+    assert.strictEqual(started, 2, 'the replacement run reads the other sensor')
+
+    pending.shift()(null, 20)
+    await drain()
+
+    const before = started
+    await advance(10000)
+    assert.strictEqual(started, before,
+      'the straggler freed the cycle that replaced it, so a rival chain started')
+  })
+
   it('costs one blocked thread and not one per sensor', async function (t) {
     // The driver holds the bus master's lock for the whole conversion, so a
     // read that never returns is still holding it. Every sensor behind it
@@ -636,14 +666,18 @@ describe('configuration hygiene', function () {
 
   it('matches a hand-typed sensor id regardless of case or stray spaces', async function () {
     // matched loosely, such an entry loses its path and is written back as a
-    // duplicate, and the bus answers to nothing but its own spelling
+    // duplicate, and the bus answers to nothing but its own spelling.
+    // The id has to carry hex letters for the case half of this to mean
+    // anything: upper-casing '28-000000000001' changes not one character.
+    const HEX = '28-3c01e0764633'
     const app = fakeApp()
     const asked = []
+    w1.listSensors = (root, cb) => process.nextTick(cb, null, [HEX])
     w1.readTemperature = (root, id, cb) => { asked.push(id); process.nextTick(cb, null, 20) }
-    const options = opts([dev(' 28-000000000001 '.toUpperCase(), { path: 'a.b', offset: 1 })])
+    const options = opts([dev(' ' + HEX.toUpperCase() + ' ', { path: 'a.b', offset: 1 })])
     await start(app, options)
     assert.strictEqual(options.devices.length, 1, 'the sensor was registered twice')
-    assert.deepStrictEqual(asked, [ID], 'the bus spelling has to win')
+    assert.deepStrictEqual(asked, [HEX], 'the bus spelling has to win')
     assert.strictEqual(values(app)[0].value, 294.15, 'the calibration was lost')
   })
 
